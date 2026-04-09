@@ -11,7 +11,7 @@ createApp()
         console.log('BASE_URL 未设置，将按请求 Host/Proto 动态计算（建议部署时设置 BASE_URL）');
       }
       if (!config.spMetadataPath && !config.spMetadataXml) {
-        console.log('未加载 SP metadata：访问 /idp/sp 进行配置');
+        console.log('未设置 SP metadata：已使用内置默认 SP（如需覆盖：设置 SP_METADATA_XML 或访问 /idp/sp 保存）');
       }
     });
   })

@@ -36,6 +36,7 @@ async function ensureSigningMaterial({
   privateKeyPem: providedPrivateKeyPem,
   certPem: providedCertPem,
   allowGenerate = true,
+  writeToDisk = true,
 }) {
   if (providedPrivateKeyPem && providedCertPem) {
     return {
@@ -73,8 +74,10 @@ async function ensureSigningMaterial({
     notAfterDate,
   });
 
-  writeFileAtomic(keyPath, pems.private);
-  writeFileAtomic(certPath, pems.cert);
+  if (writeToDisk) {
+    writeFileAtomic(keyPath, pems.private);
+    writeFileAtomic(certPath, pems.cert);
+  }
 
   return {
     privateKeyPem: pems.private,

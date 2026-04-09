@@ -1,1 +1,16 @@
-{"projectName":"trae_demo4amflow_xbbs"}
+{
+  "projectId": "prj_4JPqiQhPNbClJTxHfaPKXCRXD3Jl",
+  "orgId": "team_OfHOfTU4GJwTIxv7Wn1PRJbP",
+  "projectName": "demo4amflow",
+  "settings": {
+    "createdAt": 1775731223247,
+    "framework": "express",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

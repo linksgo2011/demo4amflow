@@ -6,6 +6,10 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
+    "vercel:dev": "vercel dev",
+    "vercel:deploy": "vercel",
+    "vercel:prod": "vercel --prod",
+    "gen:sp-metadata": "node scripts/gen-sp-metadata.js",
     "test": "node -e \"console.log('no tests')\""
   },
   "keywords": [],

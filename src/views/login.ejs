@@ -66,6 +66,9 @@
         <h2>模拟登录</h2>
         <p class="muted">仅用于 SP 集成测试，不做密码校验。</p>
         <form method="post" action="/idp/login">
+          <% if (saml.state) { %>
+            <input type="hidden" name="state" value="<%= saml.state %>" />
+          <% } %>
           <label>Email（NameID 默认使用 email）</label>
           <input name="email" value="test@example.com" required />
 

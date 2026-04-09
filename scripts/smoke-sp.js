@@ -97,10 +97,13 @@ async function main() {
     process.exit(1);
   }
 
+  const state = extractHiddenInput(loginPage.text, 'state');
+
   const loginPost = await httpRequest(`${idpBase}/idp/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
+      ...(state ? { state } : {}),
       email: 'test@example.com',
       displayName: 'Test User',
       uid: '10001',

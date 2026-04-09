@@ -9,8 +9,10 @@ const { config, resolveBaseUrlFromReq } = require('./config');
 const { createRequestLog } = require('./request-log');
 const { ensureSigningMaterial } = require('./saml/cert');
 const { createIdp } = require('./saml/idp');
+const { FEISHU_SP_METADATA_XML } = require('./saml/default-sp-metadata');
 const { createSpRegistry } = require('./saml/sp-registry');
 const { decodeSamlMaybe } = require('./saml/saml-message');
+const { signState, verifyState } = require('./saml/state');
 
 saml.setSchemaValidator({ validate });
 
@@ -31,9 +33,11 @@ async function createApp() {
   const requestLog = createRequestLog({ max: config.logMax });
   app.use(requestLog.middleware);
 
+  const sessionSecret = config.sessionSecret || `dev-${Math.random().toString(16).slice(2)}`;
+
   app.use(
     session({
-      secret: config.sessionSecret || `dev-${Math.random().toString(16).slice(2)}`,
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
       cookie: {
@@ -44,7 +48,7 @@ async function createApp() {
     }),
   );
 
-  const allowGenerate = !isVercel();
+  const allowGenerate = !isVercel() || config.allowEphemeralCert;
   const signingMaterial = await ensureSigningMaterial({
     keyPath: config.keyPath,
     certPath: config.certPath,
@@ -52,13 +56,16 @@ async function createApp() {
     privateKeyPem: config.idpPrivateKeyPem,
     certPem: config.idpCertPem,
     allowGenerate,
+    writeToDisk: !isVercel(),
   });
 
   const spRegistry = createSpRegistry();
   if (config.spMetadataXml) {
     spRegistry.setFromXml(config.spMetadataXml);
-  } else {
+  } else if (config.spMetadataPath) {
     spRegistry.loadFromPath(config.spMetadataPath);
+  } else {
+    spRegistry.setFromXml(FEISHU_SP_METADATA_XML);
   }
 
   const idpCache = new Map();
@@ -117,15 +124,34 @@ async function createApp() {
         (binding === 'post' ? req.body?.RelayState : req.query?.RelayState) ||
         null;
 
+      const receivedAt = new Date().toISOString();
+      const extract = parseResult?.extract || null;
+      const requestId = extract?.request?.id || null;
+
+      const state = signState(
+        {
+          binding,
+          relayState,
+          receivedAt,
+          samlRequestRaw: samlRequestRaw || null,
+          requestId,
+          spIssuer: extract?.issuer || null,
+          destination: extract?.request?.destination || null,
+        },
+        sessionSecret,
+        10 * 60,
+      );
+
       req.session.saml = {
         binding,
         relayState,
         samlRequestRaw: samlRequestRaw || null,
         requestInfo: parseResult,
-        receivedAt: new Date().toISOString(),
+        receivedAt,
+        state,
       };
 
-      return res.redirect('/idp/login');
+      return res.redirect(`/idp/login?state=${encodeURIComponent(state)}`);
     } catch (err) {
       res.status(400);
       return res.render('error', {
@@ -183,6 +209,41 @@ async function createApp() {
   });
 
   app.get('/idp/login', (req, res) => {
+    const stateToken = req.query?.state ? String(req.query.state) : null;
+    if (stateToken) {
+      const verified = verifyState(stateToken, sessionSecret);
+      if (!verified.ok) {
+        res.status(400);
+        return res.render('error', {
+          title: '登录状态无效',
+          message: verified.error,
+        });
+      }
+
+      const p = verified.payload;
+      const saml = {
+        binding: p.binding,
+        relayState: p.relayState,
+        receivedAt: p.receivedAt,
+        samlRequestRaw: p.samlRequestRaw,
+        requestId: p.requestId,
+        state: stateToken,
+      };
+      const extract = p.spIssuer || p.destination || p.requestId ? {
+        issuer: p.spIssuer,
+        request: {
+          id: p.requestId,
+          destination: p.destination,
+        },
+      } : null;
+
+      return res.render('login', {
+        saml,
+        extract,
+        samlRequestDecoded: decodeSamlMaybe(p.samlRequestRaw),
+      });
+    }
+
     const samlSession = req.session.saml || null;
     if (!samlSession) {
       res.status(400);
@@ -194,7 +255,7 @@ async function createApp() {
 
     const extract = samlSession.requestInfo?.extract || null;
 
-    res.render('login', {
+    return res.render('login', {
       saml: samlSession,
       extract,
       samlRequestDecoded: decodeSamlMaybe(samlSession.samlRequestRaw),
@@ -202,12 +263,32 @@ async function createApp() {
   });
 
   app.post('/idp/login', async (req, res) => {
-    const samlSession = req.session.saml || null;
-    if (!samlSession) {
+    let samlSession = req.session.saml || null;
+    const stateToken = req.body?.state ? String(req.body.state) : null;
+    if (stateToken) {
+      const verified = verifyState(stateToken, sessionSecret);
+      if (!verified.ok) {
+        res.status(400);
+        return res.render('error', {
+          title: '登录状态无效',
+          message: verified.error,
+        });
+      }
+      const p = verified.payload;
+      samlSession = {
+        binding: p.binding,
+        relayState: p.relayState,
+        receivedAt: p.receivedAt,
+        samlRequestRaw: p.samlRequestRaw,
+        requestInfo: p.requestId ? { extract: { request: { id: p.requestId } } } : null,
+      };
+    }
+
+    if (!samlSession || !samlSession.requestInfo) {
       res.status(400);
       return res.render('error', {
         title: '没有待处理的 SAML 请求',
-        message: '会话中未找到 AuthnRequest。请重新从 SP 发起登录。',
+        message: '未找到 AuthnRequest 上下文。请重新从 SP 发起登录。',
       });
     }
 
@@ -341,4 +422,3 @@ module.exports = {
   createApp,
   handler,
 };
-
