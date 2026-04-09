@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>配置 SP Metadata</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+      code, pre, textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      textarea { width: 100%; min-height: 360px; padding: 12px; border-radius: 10px; border: 1px solid #e5e7eb; }
+      button { padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #111827; color: white; cursor: pointer; }
+      button:hover { opacity: 0.92; }
+      .muted { color: #6b7280; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; }
+    </style>
+  </head>
+  <body>
+    <h1>SP Metadata 配置</h1>
+    <p><a href="/idp/info">返回信息面板</a></p>
+
+    <div class="card">
+      <% if (spEntry) { %>
+        <p>当前 SP EntityID：<code><%= spEntry.entityId %></code></p>
+      <% } else { %>
+        <p class="muted">当前没有配置 SP Metadata。</p>
+      <% } %>
+
+      <form method="post" action="/idp/sp">
+        <p class="muted">粘贴 SP Metadata XML（EntityDescriptor）。保存后，IdP 才能解析 AuthnRequest 并生成响应。</p>
+        <textarea name="metadataXml" spellcheck="false"><%= prefill %></textarea>
+        <p>
+          <button type="submit">保存</button>
+        </p>
+      </form>
+    </div>
+  </body>
+</html>

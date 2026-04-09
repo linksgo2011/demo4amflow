@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IdP 信息</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; min-width: 320px; flex: 1; }
+      .kv { display: grid; grid-template-columns: 180px 1fr; gap: 8px 12px; align-items: start; }
+      .k { color: #374151; }
+      .v { word-break: break-all; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      pre { background: #0b1020; color: #e5e7eb; padding: 12px; border-radius: 10px; overflow: auto; }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #f3f4f6; color: #111827; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>标准测试 IdP（samlify）</h1>
+    <p class="pill">Base URL: <%= ctx.baseUrl %></p>
+
+    <div class="row">
+      <div class="card">
+        <h2>端点</h2>
+        <div class="kv">
+          <div class="k">IdP Issuer (entityID)</div>
+          <div class="v"><code><%= ctx.issuer %></code></div>
+
+          <div class="k">Metadata</div>
+          <div class="v">
+            <a href="/saml/idp/metadata" target="_blank">/saml/idp/metadata</a>
+          </div>
+
+          <div class="k">SSO (Redirect/Post)</div>
+          <div class="v"><code><%= ctx.ssoUrl %></code></div>
+
+          <div class="k">登录页</div>
+          <div class="v"><a href="/idp/login">/idp/login</a></div>
+
+          <div class="k">SP Metadata 配置</div>
+          <div class="v"><a href="/idp/sp">/idp/sp</a></div>
+
+          <div class="k">请求记录</div>
+          <div class="v"><a href="/idp/requests">/idp/requests</a></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>SP 当前配置</h2>
+        <% if (spEntry) { %>
+          <div class="kv">
+            <div class="k">SP EntityID</div>
+            <div class="v"><code><%= spEntry.entityId %></code></div>
+          </div>
+          <p><a href="/idp/sp">更新/替换 SP Metadata</a></p>
+        <% } else { %>
+          <p>尚未配置 SP Metadata。</p>
+          <p><a href="/idp/sp">去配置</a></p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top: 16px;">
+      <div class="card">
+        <h2>SAML 证书（PEM）</h2>
+        <pre><%= ctx.certPem %></pre>
+      </div>
+      <div class="card">
+        <h2>证书（Metadata X509Certificate）</h2>
+        <pre><%= ctx.certForMetadata %></pre>
+      </div>
+    </div>
+  </body>
+</html>

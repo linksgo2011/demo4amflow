@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Posting SAMLResponse</title>
+  </head>
+  <body>
+    <form method="post" action="<%= entityEndpoint %>">
+      <input type="hidden" name="SAMLResponse" value="<%= context %>" />
+      <% if (relayState) { %>
+        <input type="hidden" name="RelayState" value="<%= relayState %>" />
+      <% } %>
+      <noscript>
+        <p>JavaScript is disabled. Click the button to continue.</p>
+        <button type="submit">Continue</button>
+      </noscript>
+    </form>
+    <script>
+      document.forms[0].submit();
+    </script>
+  </body>
+</html>

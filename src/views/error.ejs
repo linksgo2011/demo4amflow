@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %></title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .card { border: 1px solid #fecaca; background: #fff1f2; border-radius: 10px; padding: 16px; }
+      pre { background: #0b1020; color: #e5e7eb; padding: 12px; border-radius: 10px; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1><%= title %></h1>
+    <p><a href="/idp/info">返回信息面板</a> · <a href="/idp/requests">请求记录</a></p>
+    <div class="card">
+      <pre><%= message %></pre>
+    </div>
+  </body>
+</html>

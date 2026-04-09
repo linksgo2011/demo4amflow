@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IdP 登录</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+      code, pre, input, textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; min-width: 320px; flex: 1; }
+      label { display: block; margin: 10px 0 6px; color: #374151; }
+      input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb; }
+      button { margin-top: 14px; padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #111827; color: white; cursor: pointer; }
+      button:hover { opacity: 0.92; }
+      pre { background: #0b1020; color: #e5e7eb; padding: 12px; border-radius: 10px; overflow: auto; }
+      .kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; align-items: start; }
+      .k { color: #374151; }
+      .v { word-break: break-all; }
+      .muted { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    <h1>IdP 登录（用于生成 SAMLResponse）</h1>
+    <p><a href="/idp/info">信息面板</a> · <a href="/idp/requests">请求记录</a></p>
+
+    <div class="row">
+      <div class="card">
+        <h2>待处理请求</h2>
+        <div class="kv">
+          <div class="k">Binding</div>
+          <div class="v"><code><%= saml.binding %></code></div>
+
+          <div class="k">RelayState</div>
+          <div class="v"><code><%= saml.relayState || '' %></code></div>
+
+          <div class="k">收到时间</div>
+          <div class="v"><code><%= saml.receivedAt %></code></div>
+
+          <% if (extract) { %>
+            <div class="k">SP Issuer</div>
+            <div class="v"><code><%= extract.issuer %></code></div>
+
+            <div class="k">AuthnRequest ID</div>
+            <div class="v"><code><%= extract.request && extract.request.id ? extract.request.id : '' %></code></div>
+
+            <div class="k">Destination</div>
+            <div class="v"><code><%= extract.request && extract.request.destination ? extract.request.destination : '' %></code></div>
+          <% } %>
+        </div>
+
+        <details style="margin-top: 12px;">
+          <summary>尝试解码的 SAMLRequest（调试用）</summary>
+          <% if (samlRequestDecoded && samlRequestDecoded.xml) { %>
+            <p class="muted">encoding: <code><%= samlRequestDecoded.encoding %></code></p>
+            <pre><%= samlRequestDecoded.xml %></pre>
+          <% } else { %>
+            <p class="muted">无可展示内容。</p>
+          <% } %>
+        </details>
+      </div>
+
+      <div class="card">
+        <h2>模拟登录</h2>
+        <p class="muted">仅用于 SP 集成测试，不做密码校验。</p>
+        <form method="post" action="/idp/login">
+          <label>Email（NameID 默认使用 email）</label>
+          <input name="email" value="test@example.com" required />
+
+          <label>Display Name（可选）</label>
+          <input name="displayName" value="Test User" />
+
+          <label>UID（可选）</label>
+          <input name="uid" value="10001" />
+
+          <button type="submit">生成并返回 SAMLResponse</button>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
