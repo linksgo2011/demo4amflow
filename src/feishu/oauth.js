@@ -44,8 +44,45 @@ async function exchangeCodeForToken({ clientId, clientSecret, code, redirectUri 
   return json;
 }
 
+async function refreshUserAccessToken({ clientId, clientSecret, refreshToken, scope }) {
+  const url = 'https://open.feishu.cn/open-apis/authen/v2/oauth/token';
+  const body = {
+    grant_type: 'refresh_token',
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+  };
+  if (scope) body.scope = scope;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await resp.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    const err = new Error('ERR_FEISHU_REFRESH_NON_JSON');
+    err.details = { status: resp.status, text };
+    throw err;
+  }
+
+  if (!resp.ok) {
+    const err = new Error('ERR_FEISHU_REFRESH_HTTP');
+    err.details = { status: resp.status, body: json };
+    throw err;
+  }
+
+  return json;
+}
+
 module.exports = {
   buildAuthorizeUrl,
   exchangeCodeForToken,
+  refreshUserAccessToken,
 };
-

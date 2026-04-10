@@ -30,6 +30,8 @@
       <summary class="muted">当前 user_access_token（预览：<code><%= tokenPreview || '' %></code>…）</summary>
       <p class="muted" style="margin-top: 8px;">如果你需要复制 token（用于调试），打开下面接口会返回完整值：</p>
       <p><code><%= baseUrl %>/feishu/api/token</code></p>
+      <p class="muted">如果你已开启 offline_access 并获取到了 refresh_token，可手动触发刷新：</p>
+      <p><a href="/chat/refresh"><code>/chat/refresh</code></a></p>
     </details>
 
     <div class="row">

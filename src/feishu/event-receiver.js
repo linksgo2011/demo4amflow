@@ -22,13 +22,13 @@ function registerFeishuEventReceiver({ app, config, requestLog, eventsStore }) {
   app.post('/feishu/events/receive', (req, res) => {
     const body = req.body || {};
 
-    if (body.type === 'url_verification' && body.challenge) {
+    if (body.challenge) {
       if (!verifyToken({ expected: config.feishuVerificationToken, got: body.token })) {
         if (requestLog) requestLog.pushEvent('feishu.event.verify_fail', { reason: 'token_mismatch' });
         return res.status(401).json({ error: 'invalid_token' });
       }
       if (requestLog) requestLog.pushEvent('feishu.event.url_verification', { ok: true });
-      return res.json({ challenge: body.challenge });
+      return res.status(200).json({ challenge: body.challenge });
     }
 
     if (body.encrypt) {

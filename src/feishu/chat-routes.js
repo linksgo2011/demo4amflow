@@ -1,4 +1,4 @@
-const { buildAuthorizeUrl, exchangeCodeForToken } = require('./oauth');
+const { buildAuthorizeUrl, exchangeCodeForToken, refreshUserAccessToken } = require('./oauth');
 
 function registerChatRoutes({
   app,
@@ -63,6 +63,61 @@ function registerChatRoutes({
   app.get('/chat/logout', (req, res) => {
     if (req.session) req.session.feishu = null;
     res.redirect('/chat');
+  });
+
+  app.get('/chat/refresh', async (req, res) => {
+    if (!config.feishuClientId || !config.feishuClientSecret) {
+      res.status(400);
+      return res.render('error', {
+        title: '缺少飞书配置',
+        message: '请先配置 FEISHU_CLIENT_ID 与 FEISHU_CLIENT_SECRET。',
+      });
+    }
+
+    const refreshToken = req.session?.feishu?.refreshToken;
+    if (!refreshToken) {
+      res.status(400);
+      return res.render('error', {
+        title: '缺少 refresh_token',
+        message: '请在授权时包含 offline_access scope，并确保首次换 token 时返回 refresh_token。',
+      });
+    }
+
+    try {
+      const tokenResp = await refreshUserAccessToken({
+        clientId: config.feishuClientId,
+        clientSecret: config.feishuClientSecret,
+        refreshToken,
+      });
+      const data = tokenResp.data || tokenResp;
+      const userAccessToken = data.access_token || null;
+      if (userAccessToken) {
+        req.session.feishu = {
+          ...(req.session.feishu || {}),
+          userAccessToken,
+          refreshToken: data.refresh_token || null,
+          expiresIn: data.expires_in || null,
+          refreshTokenExpiresIn: data.refresh_token_expires_in || null,
+          scope: data.scope || null,
+          tokenType: data.token_type || null,
+          obtainedAt: new Date().toISOString(),
+        };
+      }
+      if (requestLog) requestLog.pushEvent('feishu.oauth.refresh', { ok: true });
+      return res.redirect('/chat');
+    } catch (err) {
+      if (requestLog) {
+        requestLog.pushEvent('feishu.oauth.refresh_error', {
+          error: String(err && err.stack ? err.stack : err),
+          details: err && err.details ? err.details : null,
+        });
+      }
+      res.status(500);
+      return res.render('error', {
+        title: '刷新 user_access_token 失败',
+        message: String(err && err.stack ? err.stack : err),
+      });
+    }
   });
 
   app.post('/chat/token', (req, res) => {
