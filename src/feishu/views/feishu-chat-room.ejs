@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>/chat - 群聊</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+      code, pre, input, button { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; flex: 1; min-width: 360px; }
+      .muted { color: #6b7280; }
+      .msg { border-bottom: 1px solid #e5e7eb; padding: 10px 0; }
+      .msg:last-child { border-bottom: none; }
+      .meta { font-size: 12px; color: #6b7280; }
+      input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb; }
+      button { padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #111827; color: white; cursor: pointer; }
+      button:hover { opacity: 0.92; }
+      pre { background: #0b1020; color: #e5e7eb; padding: 12px; border-radius: 10px; overflow: auto; max-height: 420px; }
+      .toolbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+    </style>
+  </head>
+  <body>
+    <h1>/chat - 固定群聊</h1>
+    <p><a href="/idp/info">IdP 信息面板</a> · <a href="/idp/requests">集成报文记录</a> · <a href="/chat/logout">退出</a></p>
+
+    <details style="margin: 10px 0 18px;">
+      <summary class="muted">当前 user_access_token（预览：<code><%= tokenPreview || '' %></code>…）</summary>
+      <p class="muted" style="margin-top: 8px;">如果你需要复制 token（用于调试），打开下面接口会返回完整值：</p>
+      <p><code><%= baseUrl %>/feishu/api/token</code></p>
+    </details>
+
+    <div class="row">
+      <div class="card">
+        <div class="toolbar">
+          <div>
+            <div class="muted">chat_id</div>
+            <div><code><%= chatId %></code></div>
+          </div>
+          <div>
+            <button id="btnRefresh" type="button">刷新历史</button>
+          </div>
+        </div>
+
+        <div id="messages" style="margin-top: 12px;"></div>
+
+        <form id="sendForm" style="margin-top: 16px;">
+          <div class="muted">发送消息（text）</div>
+          <input id="text" placeholder="输入要发送的内容…" />
+          <div style="margin-top: 10px;">
+            <button type="submit">发送</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div>
+            <div class="muted">接收消息（事件回调）</div>
+            <div class="muted">回调地址：<code><%= baseUrl %>/feishu/events/receive</code></div>
+          </div>
+          <div style="display:flex; gap: 10px;">
+            <button id="btnClearEvents" type="button">清空</button>
+          </div>
+        </div>
+        <pre id="events" style="margin-top: 12px;"></pre>
+      </div>
+    </div>
+
+    <script>
+      async function apiGet(url) {
+        const res = await fetch(url);
+        const text = await res.text();
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) throw new Error(text || String(res.status));
+        return json;
+      }
+
+      async function apiPost(url, body) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body || {}),
+        });
+        const text = await res.text();
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) throw new Error(text || String(res.status));
+        return json;
+      }
+
+      function renderMessages(items) {
+        const el = document.getElementById('messages');
+        el.innerHTML = '';
+        if (!items || !items.length) {
+          el.innerHTML = '<div class="muted">暂无消息</div>';
+          return;
+        }
+        for (const it of items) {
+          const div = document.createElement('div');
+          div.className = 'msg';
+          const ts = it.createTime ? new Date(Number(it.createTime)).toISOString() : '';
+          div.innerHTML = `
+            <div>${(it.text || '').replace(/</g,'&lt;')}</div>
+            <div class="meta">
+              <code>${it.msgType || ''}</code>
+              <span> · </span>
+              <code>${it.senderIdType || ''}:${it.senderId || ''}</code>
+              <span> · </span>
+              <code>${ts}</code>
+            </div>
+          `;
+          el.appendChild(div);
+        }
+      }
+
+      async function refreshMessages() {
+        const data = await apiGet('/feishu/api/messages?pageSize=20');
+        renderMessages(data.items || []);
+      }
+
+      async function refreshEvents() {
+        const data = await apiGet('/feishu/api/events');
+        document.getElementById('events').textContent = JSON.stringify(data.items || [], null, 2);
+      }
+
+      document.getElementById('btnRefresh').addEventListener('click', () => {
+        refreshMessages().catch((e) => alert(String(e)));
+      });
+
+      document.getElementById('sendForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('text');
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        try {
+          await apiPost('/feishu/api/messages', { text });
+          await refreshMessages();
+        } catch (err) {
+          alert(String(err));
+        }
+      });
+
+      document.getElementById('btnClearEvents').addEventListener('click', async () => {
+        try {
+          await apiPost('/feishu/api/events/clear', {});
+          await refreshEvents();
+        } catch (err) {
+          alert(String(err));
+        }
+      });
+
+      refreshMessages().catch(() => {});
+      refreshEvents().catch(() => {});
+      setInterval(() => refreshEvents().catch(() => {}), 3000);
+    </script>
+  </body>
+</html>

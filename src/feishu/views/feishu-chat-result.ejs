@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>/chat - 授权结果</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; max-width: 980px; }
+      pre { background: #0b1020; color: #e5e7eb; padding: 12px; border-radius: 10px; overflow: auto; }
+      .kv { display: grid; grid-template-columns: 200px 1fr; gap: 8px 12px; align-items: start; }
+      .v { word-break: break-all; }
+      .muted { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    <h1>/chat - 授权结果</h1>
+    <p><a href="/chat">返回 /chat</a></p>
+
+    <div class="card">
+      <div class="kv">
+        <div class="muted">redirect_uri</div>
+        <div class="v"><code><%= redirectUri %></code></div>
+
+        <div class="muted">code</div>
+        <div class="v"><code><%= code %></code></div>
+
+        <div class="muted">user_access_token</div>
+        <div class="v"><code><%= userAccessToken || '' %></code></div>
+      </div>
+
+      <h2 style="margin-top: 16px;">Raw Response</h2>
+      <pre><%= JSON.stringify(raw, null, 2) %></pre>
+    </div>
+  </body>
+</html>
+

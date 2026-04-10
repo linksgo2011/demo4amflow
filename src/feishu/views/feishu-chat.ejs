@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>/chat - 飞书授权 Demo</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; max-width: 880px; }
+      .muted { color: #6b7280; }
+      button { padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #111827; color: white; cursor: pointer; }
+      button:hover { opacity: 0.92; }
+      .kv { display: grid; grid-template-columns: 200px 1fr; gap: 8px 12px; align-items: start; }
+      .v { word-break: break-all; }
+      .warn { border: 1px solid #fecaca; background: #fff1f2; padding: 12px; border-radius: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>/chat - 飞书授权 Demo</h1>
+    <p><a href="/idp/info">回到 IdP 信息面板</a></p>
+
+    <div class="card">
+      <div class="kv">
+        <div class="muted">Base URL</div>
+        <div class="v"><code><%= baseUrl %></code></div>
+
+        <div class="muted">Redirect URI</div>
+        <div class="v"><code><%= redirectUri %></code></div>
+
+        <div class="muted">Scope（可选）</div>
+        <div class="v"><code><%= scope || '' %></code></div>
+      </div>
+
+      <% if (!hasCreds) { %>
+        <div class="warn" style="margin-top: 16px;">
+          <div>缺少飞书配置：请设置环境变量 <code>FEISHU_CLIENT_ID</code> 与 <code>FEISHU_CLIENT_SECRET</code>。</div>
+          <div class="muted" style="margin-top: 6px;">配置完成后刷新此页再点击授权。</div>
+        </div>
+      <% } %>
+
+      <p style="margin-top: 16px;">
+        <a href="/chat/login"><button type="button">开始飞书授权</button></a>
+      </p>
+
+      <details style="margin-top: 14px;">
+        <summary class="muted">已有 user_access_token？手动填入</summary>
+        <form method="post" action="/chat/token" style="margin-top: 10px;">
+          <input name="userAccessToken" placeholder="粘贴 user_access_token…" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #e5e7eb;" />
+          <p style="margin-top: 10px;">
+            <button type="submit">保存并进入聊天</button>
+          </p>
+        </form>
+      </details>
+
+      <p class="muted">目标：获取 user_access_token，并在回调页展示。</p>
+    </div>
+  </body>
+</html>

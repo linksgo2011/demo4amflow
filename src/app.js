@@ -12,6 +12,11 @@ const { FEISHU_SP_METADATA_XML } = require('./saml/default-sp-metadata');
 const { createSpRegistry } = require('./saml/sp-registry');
 const { decodeSamlMaybe } = require('./saml/saml-message');
 const { signState, verifyState } = require('./saml/state');
+const { registerChatRoutes } = require('./feishu/chat-routes');
+const { registerFeishuApiRoutes } = require('./feishu/im-routes');
+const { registerFeishuEventReceiver } = require('./feishu/event-receiver');
+const { createEventsStore } = require('./feishu/events-store');
+const { startFeishuLongConnection } = require('./feishu/long-connection');
 
 function isVercel() {
   return Boolean(process.env.VERCEL);
@@ -31,13 +36,15 @@ async function createApp() {
 
   app.set('trust proxy', config.trustProxy);
   app.set('view engine', 'ejs');
-  app.set('views', `${__dirname}/views`);
+  app.set('views', [`${__dirname}/views`, `${__dirname}/feishu/views`]);
 
   app.use(express.urlencoded({ extended: false, limit: '2mb' }));
   app.use(express.json({ limit: '2mb' }));
 
   const requestLog = createRequestLog({ max: config.logMax });
-  app.use('/saml', requestLog.middleware);
+  app.use(['/saml', '/feishu'], requestLog.middleware);
+
+  const feishuEvents = createEventsStore({ max: 200 });
 
   const sessionSecret = config.sessionSecret || `dev-${Math.random().toString(16).slice(2)}`;
 
@@ -108,6 +115,50 @@ async function createApp() {
     res.type('application/xml');
     res.send(idp.getMetadata());
   });
+
+  registerChatRoutes({
+    app,
+    config,
+    resolveBaseUrlFromReq,
+    sessionSecret,
+    signState,
+    verifyState,
+    requestLog,
+  });
+
+  registerFeishuApiRoutes({
+    app,
+    config,
+    requestLog,
+    eventsStore: feishuEvents,
+  });
+
+  registerFeishuEventReceiver({
+    app,
+    config,
+    requestLog,
+    eventsStore: feishuEvents,
+  });
+
+  if (config.feishuLongConnection) {
+    if (isVercel()) {
+      console.warn('FEISHU_LONG_CONNECTION 已开启，但 Vercel Serverless 不适合运行长连接。请在本地或常驻服务器运行。');
+    } else {
+      try {
+        startFeishuLongConnection({
+          config,
+          requestLog,
+          eventsStore: feishuEvents,
+        });
+        requestLog.pushEvent('feishu.ws.started', { ok: true });
+      } catch (err) {
+        requestLog.pushEvent('feishu.ws.error', {
+          error: String(err && err.stack ? err.stack : err),
+          details: err && err.details ? err.details : null,
+        });
+      }
+    }
+  }
 
   app.all('/saml/idp/sso', async (req, res) => {
     const spEntry = spRegistry.get();
