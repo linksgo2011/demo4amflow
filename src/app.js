@@ -1,7 +1,6 @@
 require('dotenv').config();
 
 const saml = require('samlify');
-const { validate } = require('@authenio/samlify-xsd-schema-validator');
 const express = require('express');
 const session = require('express-session');
 
@@ -14,13 +13,20 @@ const { createSpRegistry } = require('./saml/sp-registry');
 const { decodeSamlMaybe } = require('./saml/saml-message');
 const { signState, verifyState } = require('./saml/state');
 
-saml.setSchemaValidator({ validate });
-
 function isVercel() {
   return Boolean(process.env.VERCEL);
 }
 
 async function createApp() {
+  if (isVercel() || config.disableSchemaValidation) {
+    saml.setSchemaValidator({
+      validate: async () => 'SKIPPED_VALIDATE_XML',
+    });
+  } else {
+    const { validate } = require('@authenio/samlify-xsd-schema-validator');
+    saml.setSchemaValidator({ validate });
+  }
+
   const app = express();
 
   app.set('trust proxy', config.trustProxy);
@@ -31,7 +37,7 @@ async function createApp() {
   app.use(express.json({ limit: '2mb' }));
 
   const requestLog = createRequestLog({ max: config.logMax });
-  app.use(requestLog.middleware);
+  app.use('/saml', requestLog.middleware);
 
   const sessionSecret = config.sessionSecret || `dev-${Math.random().toString(16).slice(2)}`;
 
@@ -128,12 +134,23 @@ async function createApp() {
       const extract = parseResult?.extract || null;
       const requestId = extract?.request?.id || null;
 
+      const decoded = decodeSamlMaybe(samlRequestRaw);
+      requestLog.pushEvent('saml.request', {
+        binding,
+        relayState,
+        requestId,
+        spIssuer: extract?.issuer || null,
+        destination: extract?.request?.destination || null,
+        samlRequestLength: samlRequestRaw ? String(samlRequestRaw).length : 0,
+        samlRequestDecodedEncoding: decoded?.encoding || null,
+        samlRequestDecodedXml: decoded?.xml ? String(decoded.xml).slice(0, 12000) : null,
+      });
+
       const state = signState(
         {
           binding,
           relayState,
           receivedAt,
-          samlRequestRaw: samlRequestRaw || null,
           requestId,
           spIssuer: extract?.issuer || null,
           destination: extract?.request?.destination || null,
@@ -141,6 +158,32 @@ async function createApp() {
         sessionSecret,
         10 * 60,
       );
+
+      requestLog.pushEvent('saml.sso.parsed', {
+        binding,
+        relayState,
+        requestId,
+        spIssuer: extract?.issuer || null,
+        destination: extract?.request?.destination || null,
+      });
+
+      if (config.debugSaml) {
+        console.log(
+          JSON.stringify(
+            {
+              event: 'saml.sso.parsed',
+              binding,
+              relayState,
+              requestId,
+              spIssuer: extract?.issuer || null,
+              destination: extract?.request?.destination || null,
+              samlRequestLength: samlRequestRaw ? String(samlRequestRaw).length : 0,
+            },
+            null,
+            2,
+          ),
+        );
+      }
 
       req.session.saml = {
         binding,
@@ -153,6 +196,23 @@ async function createApp() {
 
       return res.redirect(`/idp/login?state=${encodeURIComponent(state)}`);
     } catch (err) {
+      requestLog.pushEvent('saml.sso.error', {
+        binding,
+        error: String(err && err.stack ? err.stack : err),
+      });
+      if (config.debugSaml) {
+        console.log(
+          JSON.stringify(
+            {
+              event: 'saml.sso.error',
+              binding,
+              error: String(err && err.stack ? err.stack : err),
+            },
+            null,
+            2,
+          ),
+        );
+      }
       res.status(400);
       return res.render('error', {
         title: '解析 AuthnRequest 失败',
@@ -225,7 +285,7 @@ async function createApp() {
         binding: p.binding,
         relayState: p.relayState,
         receivedAt: p.receivedAt,
-        samlRequestRaw: p.samlRequestRaw,
+        samlRequestRaw: null,
         requestId: p.requestId,
         state: stateToken,
       };
@@ -240,7 +300,7 @@ async function createApp() {
       return res.render('login', {
         saml,
         extract,
-        samlRequestDecoded: decodeSamlMaybe(p.samlRequestRaw),
+        samlRequestDecoded: null,
       });
     }
 
@@ -279,12 +339,13 @@ async function createApp() {
         binding: p.binding,
         relayState: p.relayState,
         receivedAt: p.receivedAt,
-        samlRequestRaw: p.samlRequestRaw,
+        samlRequestRaw: null,
         requestInfo: p.requestId ? { extract: { request: { id: p.requestId } } } : null,
       };
     }
 
     if (!samlSession || !samlSession.requestInfo) {
+      requestLog.pushEvent('saml.login.error', { error: 'missing_request_context' });
       res.status(400);
       return res.render('error', {
         title: '没有待处理的 SAML 请求',
@@ -381,10 +442,59 @@ async function createApp() {
         samlSession.relayState || undefined,
       );
 
+      requestLog.pushEvent('saml.login.response', {
+        inResponseTo,
+        relayState: samlSession.relayState || null,
+        entityEndpoint: response.entityEndpoint,
+        samlResponseLength: response.context ? String(response.context).length : 0,
+      });
+
+      let samlResponseXml = null;
+      try {
+        samlResponseXml = Buffer.from(String(response.context || ''), 'base64').toString('utf8');
+      } catch {}
+      requestLog.pushEvent('saml.response', {
+        inResponseTo,
+        relayState: samlSession.relayState || null,
+        acs: response.entityEndpoint,
+        samlResponseXml: samlResponseXml ? samlResponseXml.slice(0, 12000) : null,
+      });
+
+      if (config.debugSaml) {
+        console.log(
+          JSON.stringify(
+            {
+              event: 'saml.login.response',
+              inResponseTo,
+              relayState: samlSession.relayState || null,
+              entityEndpoint: response.entityEndpoint,
+              samlResponseLength: response.context ? String(response.context).length : 0,
+            },
+            null,
+            2,
+          ),
+        );
+      }
+
       req.session.saml = null;
 
       return res.render('saml-post', response);
     } catch (err) {
+      requestLog.pushEvent('saml.login.error', {
+        error: String(err && err.stack ? err.stack : err),
+      });
+      if (config.debugSaml) {
+        console.log(
+          JSON.stringify(
+            {
+              event: 'saml.login.error',
+              error: String(err && err.stack ? err.stack : err),
+            },
+            null,
+            2,
+          ),
+        );
+      }
       res.status(500);
       return res.render('error', {
         title: '生成 SAMLResponse 失败',

@@ -37,6 +37,15 @@ function createRequestLog({ max = 200 } = {}) {
     if (items.length > max) items.length = max;
   }
 
+  function pushEvent(event, data) {
+    push({
+      id: randomUUID(),
+      ts: new Date().toISOString(),
+      event,
+      data: data || null,
+    });
+  }
+
   function list() {
     return items.slice();
   }
@@ -61,7 +70,7 @@ function createRequestLog({ max = 200 } = {}) {
     next();
   }
 
-  return { middleware, list, clear };
+  return { middleware, list, clear, pushEvent };
 }
 
 module.exports = { createRequestLog };

@@ -19,7 +19,7 @@
     </style>
   </head>
   <body>
-    <h1>请求记录</h1>
+    <h1>集成报文记录</h1>
     <p><a href="/idp/info">返回信息面板</a></p>
 
     <form method="post" action="/idp/requests/clear" style="margin: 12px 0;">
@@ -31,7 +31,7 @@
       <thead>
         <tr>
           <th>时间</th>
-          <th>请求</th>
+          <th>类型</th>
           <th>详情</th>
         </tr>
       </thead>
@@ -40,8 +40,12 @@
           <tr>
             <td><code><%= it.ts %></code></td>
             <td>
-              <div><code><%= it.method %> <%= it.originalUrl %></code></div>
-              <div class="muted"><code><%= it.ip %></code></div>
+              <% if (it.event) { %>
+                <div><code><%= it.event %></code></div>
+              <% } else { %>
+                <div><code><%= it.method %> <%= it.originalUrl %></code></div>
+                <div class="muted"><code><%= it.ip %></code></div>
+              <% } %>
             </td>
             <td>
               <details>

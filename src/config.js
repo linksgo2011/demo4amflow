@@ -35,6 +35,8 @@ const config = {
   idpPrivateKeyPem: process.env.IDP_PRIVATE_KEY_PEM || null,
   idpCertPem: process.env.IDP_CERT_PEM || null,
   allowEphemeralCert: envBool(process.env.ALLOW_EPHEMERAL_CERT, false),
+  debugSaml: envBool(process.env.DEBUG_SAML, false),
+  disableSchemaValidation: envBool(process.env.DISABLE_SCHEMA_VALIDATION, false),
   keyPath: path.resolve(process.env.KEY_PATH || './data/keys/idp.key.pem'),
   certPath: path.resolve(process.env.CERT_PATH || './data/keys/idp.cert.pem'),
   logMax: envInt(process.env.LOG_MAX, 200),

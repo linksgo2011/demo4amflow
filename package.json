@@ -10,6 +10,7 @@
     "vercel:deploy": "vercel",
     "vercel:prod": "vercel --prod",
     "gen:sp-metadata": "node scripts/gen-sp-metadata.js",
+    "gen:idp-keypair": "node scripts/gen-idp-keypair.js",
     "test": "node -e \"console.log('no tests')\""
   },
   "keywords": [],
