@@ -1,4 +1,38 @@
 const { buildAuthorizeUrl, exchangeCodeForToken, refreshUserAccessToken } = require('./oauth');
+const { getCookie, signToken, verifyTokenCookie } = require('./token-cookie');
+
+const FEISHU_UAT_COOKIE = 'feishu_uat';
+const FEISHU_RT_COOKIE = 'feishu_rt';
+
+function setFeishuTokenCookie(res, { token, secret, secure }) {
+  const signed = signToken(token, secret);
+  res.cookie(FEISHU_UAT_COOKIE, signed, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: Boolean(secure),
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+}
+
+function setFeishuRefreshTokenCookie(res, { refreshToken, secret, secure }) {
+  const signed = signToken(refreshToken, secret);
+  res.cookie(FEISHU_RT_COOKIE, signed, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: Boolean(secure),
+    path: '/',
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+}
+
+function clearFeishuTokenCookie(res) {
+  res.clearCookie(FEISHU_UAT_COOKIE, { path: '/' });
+}
+
+function clearFeishuRefreshTokenCookie(res) {
+  res.clearCookie(FEISHU_RT_COOKIE, { path: '/' });
+}
 
 function registerChatRoutes({
   app,
@@ -12,13 +46,33 @@ function registerChatRoutes({
   app.get('/chat', (req, res) => {
     const baseUrl = config.baseUrl || resolveBaseUrlFromReq(req);
     const redirectUri = `${baseUrl}/chat/callback`;
-    const hasToken = Boolean(req.session?.feishu?.userAccessToken);
+    const sessionToken = req.session?.feishu?.userAccessToken || null;
+    let cookieToken = null;
+    if (!sessionToken) {
+      const cookieValue = getCookie(req, FEISHU_UAT_COOKIE);
+      const verified = verifyTokenCookie(cookieValue, sessionSecret);
+      if (verified.ok) {
+        cookieToken = verified.token;
+        req.session.feishu = { ...(req.session.feishu || {}), userAccessToken: cookieToken };
+      }
+    }
+
+    const sessionRefresh = req.session?.feishu?.refreshToken || null;
+    if (!sessionRefresh) {
+      const cookieValue = getCookie(req, FEISHU_RT_COOKIE);
+      const verified = verifyTokenCookie(cookieValue, sessionSecret);
+      if (verified.ok) {
+        req.session.feishu = { ...(req.session.feishu || {}), refreshToken: verified.token };
+      }
+    }
+
+    const hasToken = Boolean(sessionToken || cookieToken);
     res.type('text/html');
     if (hasToken) {
       return res.render('feishu-chat-room', {
         baseUrl,
         chatId: config.feishuChatId,
-        tokenPreview: String(req.session?.feishu?.userAccessToken || '').slice(0, 12),
+        tokenPreview: String(sessionToken || cookieToken || '').slice(0, 12),
       });
     }
     res.render('feishu-chat', {
@@ -62,10 +116,13 @@ function registerChatRoutes({
 
   app.get('/chat/logout', (req, res) => {
     if (req.session) req.session.feishu = null;
+    clearFeishuTokenCookie(res);
+    clearFeishuRefreshTokenCookie(res);
     res.redirect('/chat');
   });
 
   app.get('/chat/refresh', async (req, res) => {
+    const baseUrl = config.baseUrl || resolveBaseUrlFromReq(req);
     if (!config.feishuClientId || !config.feishuClientSecret) {
       res.status(400);
       return res.render('error', {
@@ -74,7 +131,15 @@ function registerChatRoutes({
       });
     }
 
-    const refreshToken = req.session?.feishu?.refreshToken;
+    let refreshToken = req.session?.feishu?.refreshToken || null;
+    if (!refreshToken) {
+      const cookieValue = getCookie(req, FEISHU_RT_COOKIE);
+      const verified = verifyTokenCookie(cookieValue, sessionSecret);
+      if (verified.ok) {
+        refreshToken = verified.token;
+        req.session.feishu = { ...(req.session.feishu || {}), refreshToken };
+      }
+    }
     if (!refreshToken) {
       res.status(400);
       return res.render('error', {
@@ -102,6 +167,14 @@ function registerChatRoutes({
           tokenType: data.token_type || null,
           obtainedAt: new Date().toISOString(),
         };
+        setFeishuTokenCookie(res, { token: userAccessToken, secret: sessionSecret, secure: baseUrl.startsWith('https://') });
+        if (data.refresh_token) {
+          setFeishuRefreshTokenCookie(res, {
+            refreshToken: data.refresh_token,
+            secret: sessionSecret,
+            secure: baseUrl.startsWith('https://'),
+          });
+        }
       }
       if (requestLog) requestLog.pushEvent('feishu.oauth.refresh', { ok: true });
       return res.redirect('/chat');
@@ -115,7 +188,9 @@ function registerChatRoutes({
       res.status(500);
       return res.render('error', {
         title: '刷新 user_access_token 失败',
-        message: String(err && err.stack ? err.stack : err),
+        message:
+          String(err && err.stack ? err.stack : err) +
+          (err && err.details ? `\n\nDETAILS:\n${JSON.stringify(err.details, null, 2)}` : ''),
       });
     }
   });
@@ -127,6 +202,7 @@ function registerChatRoutes({
       return res.render('error', { title: '参数错误', message: 'userAccessToken 不能为空' });
     }
     req.session.feishu = { userAccessToken: token, setAt: new Date().toISOString() };
+    setFeishuTokenCookie(res, { token, secret: sessionSecret, secure: (config.baseUrl || '').startsWith('https://') });
     if (requestLog) requestLog.pushEvent('feishu.token.set', { by: 'manual' });
     res.redirect('/chat');
   });
@@ -184,6 +260,14 @@ function registerChatRoutes({
           tokenType: data.token_type || null,
           obtainedAt: new Date().toISOString(),
         };
+        setFeishuTokenCookie(res, { token: userAccessToken, secret: sessionSecret, secure: baseUrl.startsWith('https://') });
+        if (data.refresh_token) {
+          setFeishuRefreshTokenCookie(res, {
+            refreshToken: data.refresh_token,
+            secret: sessionSecret,
+            secure: baseUrl.startsWith('https://'),
+          });
+        }
         if (requestLog) requestLog.pushEvent('feishu.oauth.token', { ok: true });
       }
 

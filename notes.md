@@ -10,6 +10,7 @@ https://accounts.feishu.cn/accounts/page/login?app_id=1&no_trap=1&redirect_uri=h
 https://accounts.feishu.cn/accounts/page/login?app_id=1&no_trap=1&redirect_uri=https%3A%2F%2Fdemo4amflow.vercel.app%2F
 
 
+https://passport.feishu.cn/suite/passport/page/login/?app_id=1&redirect_uri=https%3A%2F%2Faccounts.feishu.cn%2Fopen-apis%2Fauthen%2Fv1%2Fauthorize%3Fclient_id%3Dcli_a1e2586a21f9d00b%26response_type%3Dcode%26redirect_uri%3Dhttps%3A%2F%2Fdemo4amflow.vercel.app%26scope%3Dcontact%3Auser.employee_id%3Areadonly%26state%3D0415&auto_sso_domain=demo4amflow
 
 
 ## 临时记录

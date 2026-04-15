@@ -78,6 +78,12 @@ async function refreshUserAccessToken({ clientId, clientSecret, refreshToken, sc
     throw err;
   }
 
+  if (json && typeof json.code === 'number' && json.code !== 0) {
+    const err = new Error('ERR_FEISHU_REFRESH_CODE');
+    err.details = { code: json.code, msg: json.msg, body: json };
+    throw err;
+  }
+
   return json;
 }
 

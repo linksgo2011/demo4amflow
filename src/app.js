@@ -129,6 +129,7 @@ async function createApp() {
   registerFeishuApiRoutes({
     app,
     config,
+    sessionSecret,
     requestLog,
     eventsStore: feishuEvents,
   });

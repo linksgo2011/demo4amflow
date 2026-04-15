@@ -1,5 +1,9 @@
 const { listChatMessages, sendTextMessageToChat } = require('./im');
 const { refreshUserAccessToken } = require('./oauth');
+const { getCookie, verifyTokenCookie } = require('./token-cookie');
+
+const FEISHU_UAT_COOKIE = 'feishu_uat';
+const FEISHU_RT_COOKIE = 'feishu_rt';
 
 function msUntilExpiry(sessionFeishu) {
   const expiresIn = Number(sessionFeishu?.expiresIn || 0);
@@ -8,16 +12,33 @@ function msUntilExpiry(sessionFeishu) {
   return obtainedAt + expiresIn * 1000 - Date.now();
 }
 
-async function getUserAccessToken(req, config) {
-  const sessionFeishu = req.session?.feishu || null;
-  const token = sessionFeishu?.userAccessToken || null;
+async function getUserAccessToken(req, config, sessionSecret) {
+  const sessionFeishu0 = req.session?.feishu || null;
+  let token = sessionFeishu0?.userAccessToken || null;
+  if (!token) {
+    const cookieValue = getCookie(req, FEISHU_UAT_COOKIE);
+    const verified = verifyTokenCookie(cookieValue, sessionSecret);
+    if (verified.ok) {
+      token = verified.token;
+      req.session.feishu = { ...(req.session.feishu || {}), userAccessToken: token };
+    }
+  }
   if (!token) return null;
 
+  const sessionFeishu = req.session?.feishu || null;
   const leftMs = msUntilExpiry(sessionFeishu);
   if (leftMs === null) return token;
   if (leftMs > 60 * 1000) return token;
 
-  const refreshToken = sessionFeishu?.refreshToken || null;
+  let refreshToken = sessionFeishu?.refreshToken || null;
+  if (!refreshToken) {
+    const cookieValue = getCookie(req, FEISHU_RT_COOKIE);
+    const verified = verifyTokenCookie(cookieValue, sessionSecret);
+    if (verified.ok) {
+      refreshToken = verified.token;
+      req.session.feishu = { ...(req.session.feishu || {}), refreshToken };
+    }
+  }
   if (!refreshToken) return token;
   if (!config.feishuClientId || !config.feishuClientSecret) return token;
 
@@ -44,7 +65,7 @@ async function getUserAccessToken(req, config) {
   return newAccessToken;
 }
 
-function registerFeishuApiRoutes({ app, config, requestLog, eventsStore }) {
+function registerFeishuApiRoutes({ app, config, sessionSecret, requestLog, eventsStore }) {
   app.get('/feishu/api/state', (req, res) => {
     res.json({
       chatId: config.feishuChatId,
@@ -53,11 +74,27 @@ function registerFeishuApiRoutes({ app, config, requestLog, eventsStore }) {
   });
 
   app.get('/feishu/api/token', (req, res) => {
+    const userAccessToken = req.session?.feishu?.userAccessToken || null;
+    if (!userAccessToken) {
+      const cookieValue = getCookie(req, FEISHU_UAT_COOKIE);
+      const verified = verifyTokenCookie(cookieValue, sessionSecret);
+      if (verified.ok) {
+        req.session.feishu = { ...(req.session.feishu || {}), userAccessToken: verified.token };
+      }
+    }
+    const refreshToken = req.session?.feishu?.refreshToken || null;
+    if (!refreshToken) {
+      const cookieValue = getCookie(req, FEISHU_RT_COOKIE);
+      const verified = verifyTokenCookie(cookieValue, sessionSecret);
+      if (verified.ok) {
+        req.session.feishu = { ...(req.session.feishu || {}), refreshToken: verified.token };
+      }
+    }
+    const token = req.session?.feishu?.userAccessToken || null;
+    if (!token) return res.status(401).json({ error: 'missing_user_access_token' });
     const sessionFeishu = req.session?.feishu || null;
-    const userAccessToken = sessionFeishu?.userAccessToken || null;
-    if (!userAccessToken) return res.status(401).json({ error: 'missing_user_access_token' });
     return res.json({
-      userAccessToken,
+      userAccessToken: token,
       expiresIn: sessionFeishu?.expiresIn || null,
       obtainedAt: sessionFeishu?.obtainedAt || null,
       refreshToken: sessionFeishu?.refreshToken ? 'present' : null,
@@ -67,7 +104,7 @@ function registerFeishuApiRoutes({ app, config, requestLog, eventsStore }) {
   app.get('/feishu/api/messages', async (req, res) => {
     let userAccessToken;
     try {
-      userAccessToken = await getUserAccessToken(req, config);
+      userAccessToken = await getUserAccessToken(req, config, sessionSecret);
     } catch (err) {
       if (requestLog) {
         requestLog.pushEvent('feishu.oauth.refresh_error', {
@@ -117,7 +154,7 @@ function registerFeishuApiRoutes({ app, config, requestLog, eventsStore }) {
   app.post('/feishu/api/messages', async (req, res) => {
     let userAccessToken;
     try {
-      userAccessToken = await getUserAccessToken(req, config);
+      userAccessToken = await getUserAccessToken(req, config, sessionSecret);
     } catch (err) {
       if (requestLog) {
         requestLog.pushEvent('feishu.oauth.refresh_error', {
