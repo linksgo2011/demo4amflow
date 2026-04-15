@@ -101,7 +101,7 @@ function registerChatRoutes({
         at: Date.now(),
       },
       sessionSecret,
-      10 * 60,
+      24 * 60 * 60,
     );
 
     const authorizeUrl = buildAuthorizeUrl({

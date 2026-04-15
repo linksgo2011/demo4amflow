@@ -208,7 +208,7 @@ async function createApp() {
           destination: extract?.request?.destination || null,
         },
         sessionSecret,
-        10 * 60,
+        24 * 60 * 60,
       );
 
       requestLog.pushEvent('saml.sso.parsed', {
