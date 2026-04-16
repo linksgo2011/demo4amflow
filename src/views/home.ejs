@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>demo4amflow</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 0; padding: 0; background: #f6f7fb; }
+      .wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+      .card { width: 100%; max-width: 520px; background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 10px 28px rgba(0,0,0,0.06); text-align: center; }
+      h1 { margin: 0 0 12px; font-size: 22px; }
+      p { margin: 0 0 18px; color: #6b7280; }
+      a { color: inherit; text-decoration: none; }
+      button { width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid #111827; background: #111827; color: white; font-size: 16px; cursor: pointer; }
+      button:hover { opacity: 0.92; }
+      .links { margin-top: 16px; font-size: 14px; color: #6b7280; display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+      .links a { color: #2563eb; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>demo4amflow</h1>
+        <p>点击按钮后将跳转到飞书登录并授权。</p>
+        <a href="/consult"><button type="button">点击咨询</button></a>
+        <div class="links">
+          <a href="/chat">聊天</a>
+          <a href="/idp/info">IdP 面板</a>
+          <a href="/idp/requests">请求记录</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+

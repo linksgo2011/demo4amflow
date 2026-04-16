@@ -17,6 +17,7 @@ const { registerFeishuApiRoutes } = require('./feishu/im-routes');
 const { registerFeishuEventReceiver } = require('./feishu/event-receiver');
 const { createEventsStore } = require('./feishu/events-store');
 const { startFeishuLongConnection } = require('./feishu/long-connection');
+const { buildConsultLoginUrl } = require('./feishu/consult');
 
 function isVercel() {
   return Boolean(process.env.VERCEL);
@@ -108,7 +109,45 @@ async function createApp() {
     console.warn('在 Vercel 环境建议设置 IDP_PRIVATE_KEY_PEM 与 IDP_CERT_PEM（避免每次冷启动导致证书变化）');
   }
 
-  app.get('/', (_req, res) => res.redirect('/idp/info'));
+  app.get('/', (_req, res) => res.render('home'));
+
+  app.get('/consult', (req, res) => {
+    const baseUrl = config.baseUrl || resolveBaseUrlFromReq(req);
+    const redirectUri = `${baseUrl}/chat/callback`;
+
+    if (!config.feishuClientId) {
+      res.status(400);
+      return res.render('error', {
+        title: '缺少飞书配置',
+        message: '请先配置 FEISHU_CLIENT_ID。',
+      });
+    }
+
+    const scope =
+      config.feishuConsultScope ||
+      config.feishuScope ||
+      'contact:user.employee_id:readonly offline_access';
+
+    const state = signState(
+      {
+        redirectUri,
+        at: Date.now(),
+      },
+      sessionSecret,
+      24 * 60 * 60,
+    );
+
+    const url = buildConsultLoginUrl({
+      clientId: config.feishuClientId,
+      redirectUri,
+      scope,
+      state,
+      passportAppId: config.feishuPassportAppId,
+      autoSsoDomain: config.feishuAutoSsoDomain,
+    });
+
+    return res.redirect(url);
+  });
 
   app.get('/saml/idp/metadata', (req, res) => {
     const { idp } = getIdpContext(req);
