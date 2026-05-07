@@ -9,11 +9,22 @@ function startFeishuLongConnection({ config, requestLog, eventsStore }) {
 
   const Lark = require('@larksuiteoapi/node-sdk');
   const client = new Lark.Client({ appId, appSecret });
+  const logger = {
+    error: (...msg) => console.error('[feishu-ws]', ...msg),
+    warn: (...msg) => console.warn('[feishu-ws]', ...msg),
+    info: (...msg) => console.info('[feishu-ws]', ...msg),
+    debug: (...msg) => console.debug('[feishu-ws]', ...msg),
+    trace: (...msg) => console.debug('[feishu-ws]', ...msg),
+  };
   const wsClient = new Lark.WSClient({
     appId,
     appSecret,
-    loggerLevel: Lark.LoggerLevel.info,
+    logger,
+    loggerLevel: Lark.LoggerLevel.debug,
   });
+
+  console.info('[feishu-ws] start', JSON.stringify({ appId }, null, 2));
+  if (requestLog) requestLog.pushEvent('feishu.ws.start', { appId });
 
   const dispatcher = new Lark.EventDispatcher({}).register({
     'im.message.receive_v1': async (data) => {
@@ -41,4 +52,3 @@ function startFeishuLongConnection({ config, requestLog, eventsStore }) {
 }
 
 module.exports = { startFeishuLongConnection };
-

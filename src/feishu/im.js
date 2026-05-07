@@ -10,7 +10,7 @@ function resolveMessageText(message) {
   return String(content);
 }
 
-async function listChatMessages({ userAccessToken, chatId, pageSize = 20, pageToken }) {
+async function listChatMessages({ userAccessToken, chatId, pageSize = 20, pageToken, requestLog }) {
   const url = new URL('https://open.feishu.cn/open-apis/im/v1/messages');
   url.searchParams.set('container_id_type', 'chat');
   url.searchParams.set('container_id', chatId);
@@ -21,6 +21,7 @@ async function listChatMessages({ userAccessToken, chatId, pageSize = 20, pageTo
     method: 'GET',
     url: url.toString(),
     userAccessToken,
+    requestLog,
   });
 
   const items = (json?.data?.items || []).map((m) => ({
@@ -41,7 +42,7 @@ async function listChatMessages({ userAccessToken, chatId, pageSize = 20, pageTo
   };
 }
 
-async function sendTextMessageToChat({ userAccessToken, chatId, text }) {
+async function sendTextMessageToChat({ userAccessToken, chatId, text, requestLog }) {
   const url = new URL('https://open.feishu.cn/open-apis/im/v1/messages');
   url.searchParams.set('receive_id_type', 'chat_id');
 
@@ -56,6 +57,7 @@ async function sendTextMessageToChat({ userAccessToken, chatId, text }) {
     url: url.toString(),
     userAccessToken,
     body,
+    requestLog,
   });
 
   return json;
@@ -65,4 +67,3 @@ module.exports = {
   listChatMessages,
   sendTextMessageToChat,
 };
-

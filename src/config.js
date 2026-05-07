@@ -40,6 +40,20 @@ const config = {
   feishuVerificationToken: process.env.FEISHU_VERIFICATION_TOKEN || null,
   feishuEncryptKey: process.env.FEISHU_ENCRYPT_KEY || null,
   feishuLongConnection: envBool(process.env.FEISHU_LONG_CONNECTION, false),
+  feishuAilyAppId: process.env.FEISHU_AILY_APP_ID || null,
+  feishuAilySkillId: process.env.FEISHU_AILY_SKILL_ID || null,
+  feishuAilyDataAssetIds: process.env.FEISHU_AILY_DATA_ASSET_IDS
+    ? String(process.env.FEISHU_AILY_DATA_ASSET_IDS)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : null,
+  feishuAilyDataAssetTagIds: process.env.FEISHU_AILY_DATA_ASSET_TAG_IDS
+    ? String(process.env.FEISHU_AILY_DATA_ASSET_TAG_IDS)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : null,
   spMetadataPath: process.env.SP_METADATA_PATH || null,
   spMetadataXml: process.env.SP_METADATA_XML || null,
   idpPrivateKeyPem: process.env.IDP_PRIVATE_KEY_PEM || null,

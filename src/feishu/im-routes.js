@@ -1,69 +1,5 @@
 const { listChatMessages, sendTextMessageToChat } = require('./im');
-const { refreshUserAccessToken } = require('./oauth');
-const { getCookie, verifyTokenCookie } = require('./token-cookie');
-
-const FEISHU_UAT_COOKIE = 'feishu_uat';
-const FEISHU_RT_COOKIE = 'feishu_rt';
-
-function msUntilExpiry(sessionFeishu) {
-  const expiresIn = Number(sessionFeishu?.expiresIn || 0);
-  const obtainedAt = sessionFeishu?.obtainedAt ? Date.parse(sessionFeishu.obtainedAt) : 0;
-  if (!expiresIn || !obtainedAt) return null;
-  return obtainedAt + expiresIn * 1000 - Date.now();
-}
-
-async function getUserAccessToken(req, config, sessionSecret) {
-  const sessionFeishu0 = req.session?.feishu || null;
-  let token = sessionFeishu0?.userAccessToken || null;
-  if (!token) {
-    const cookieValue = getCookie(req, FEISHU_UAT_COOKIE);
-    const verified = verifyTokenCookie(cookieValue, sessionSecret);
-    if (verified.ok) {
-      token = verified.token;
-      req.session.feishu = { ...(req.session.feishu || {}), userAccessToken: token };
-    }
-  }
-  if (!token) return null;
-
-  const sessionFeishu = req.session?.feishu || null;
-  const leftMs = msUntilExpiry(sessionFeishu);
-  if (leftMs === null) return token;
-  if (leftMs > 60 * 1000) return token;
-
-  let refreshToken = sessionFeishu?.refreshToken || null;
-  if (!refreshToken) {
-    const cookieValue = getCookie(req, FEISHU_RT_COOKIE);
-    const verified = verifyTokenCookie(cookieValue, sessionSecret);
-    if (verified.ok) {
-      refreshToken = verified.token;
-      req.session.feishu = { ...(req.session.feishu || {}), refreshToken };
-    }
-  }
-  if (!refreshToken) return token;
-  if (!config.feishuClientId || !config.feishuClientSecret) return token;
-
-  const tokenResp = await refreshUserAccessToken({
-    clientId: config.feishuClientId,
-    clientSecret: config.feishuClientSecret,
-    refreshToken,
-  });
-  const data = tokenResp.data || tokenResp;
-  const newAccessToken = data.access_token || null;
-  if (!newAccessToken) return token;
-
-  req.session.feishu = {
-    ...(req.session.feishu || {}),
-    userAccessToken: newAccessToken,
-    refreshToken: data.refresh_token || null,
-    expiresIn: data.expires_in || null,
-    refreshTokenExpiresIn: data.refresh_token_expires_in || null,
-    scope: data.scope || null,
-    tokenType: data.token_type || null,
-    obtainedAt: new Date().toISOString(),
-  };
-
-  return newAccessToken;
-}
+const { getUserAccessToken, ensureTokensFromCookies } = require('./user-token');
 
 function registerFeishuApiRoutes({ app, config, sessionSecret, requestLog, eventsStore }) {
   app.get('/feishu/api/state', (req, res) => {
@@ -74,22 +10,7 @@ function registerFeishuApiRoutes({ app, config, sessionSecret, requestLog, event
   });
 
   app.get('/feishu/api/token', (req, res) => {
-    const userAccessToken = req.session?.feishu?.userAccessToken || null;
-    if (!userAccessToken) {
-      const cookieValue = getCookie(req, FEISHU_UAT_COOKIE);
-      const verified = verifyTokenCookie(cookieValue, sessionSecret);
-      if (verified.ok) {
-        req.session.feishu = { ...(req.session.feishu || {}), userAccessToken: verified.token };
-      }
-    }
-    const refreshToken = req.session?.feishu?.refreshToken || null;
-    if (!refreshToken) {
-      const cookieValue = getCookie(req, FEISHU_RT_COOKIE);
-      const verified = verifyTokenCookie(cookieValue, sessionSecret);
-      if (verified.ok) {
-        req.session.feishu = { ...(req.session.feishu || {}), refreshToken: verified.token };
-      }
-    }
+    ensureTokensFromCookies(req, sessionSecret);
     const token = req.session?.feishu?.userAccessToken || null;
     if (!token) return res.status(401).json({ error: 'missing_user_access_token' });
     const sessionFeishu = req.session?.feishu || null;
@@ -126,6 +47,7 @@ function registerFeishuApiRoutes({ app, config, sessionSecret, requestLog, event
         chatId: config.feishuChatId,
         pageSize: Math.min(Number.parseInt(String(req.query?.pageSize || '20'), 10) || 20, 50),
         pageToken: req.query?.pageToken ? String(req.query.pageToken) : null,
+        requestLog,
       });
       if (requestLog) {
         requestLog.pushEvent('feishu.im.list', {
@@ -178,6 +100,7 @@ function registerFeishuApiRoutes({ app, config, sessionSecret, requestLog, event
         userAccessToken,
         chatId: config.feishuChatId,
         text,
+        requestLog,
       });
       if (requestLog) {
         requestLog.pushEvent('feishu.im.send', {

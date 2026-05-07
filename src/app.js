@@ -18,9 +18,15 @@ const { registerFeishuEventReceiver } = require('./feishu/event-receiver');
 const { createEventsStore } = require('./feishu/events-store');
 const { startFeishuLongConnection } = require('./feishu/long-connection');
 const { buildConsultLoginUrl } = require('./feishu/consult');
+const { registerChatbotRoutes } = require('./feishu/chatbot-routes');
 
 function isVercel() {
-  return Boolean(process.env.VERCEL);
+  return Boolean(
+    process.env.VERCEL_REGION ||
+      process.env.NOW_REGION ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.LAMBDA_TASK_ROOT,
+  );
 }
 
 async function createApp() {
@@ -178,6 +184,13 @@ async function createApp() {
     config,
     requestLog,
     eventsStore: feishuEvents,
+  });
+
+  registerChatbotRoutes({
+    app,
+    config,
+    sessionSecret,
+    requestLog,
   });
 
   if (config.feishuLongConnection) {

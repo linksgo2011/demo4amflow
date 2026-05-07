@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>/chatbot - Aily 问答</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }
+      code, pre, textarea, button { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; max-width: 980px; }
+      .muted { color: #6b7280; }
+      textarea { width: 100%; min-height: 90px; padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb; }
+      button { padding: 10px 14px; border-radius: 10px; border: 1px solid #111827; background: #111827; color: white; cursor: pointer; }
+      button:hover { opacity: 0.92; }
+      pre { background: #0b1020; color: #e5e7eb; padding: 12px; border-radius: 10px; overflow: auto; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; }
+      .col { flex: 1; min-width: 360px; }
+      .warn { border: 1px solid #fecaca; background: #fff1f2; padding: 12px; border-radius: 10px; }
+      .switch { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+      select { padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: white; }
+      input, textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb; }
+    </style>
+  </head>
+  <body>
+    <h1>/chatbot - Aily 问答</h1>
+    <p class="muted"><a href="/">首页</a> · <a href="/chat">聊天</a> · <a href="/idp/requests">请求记录</a></p>
+
+    <% const _hasCreds = (typeof hasCreds !== 'undefined') ? hasCreds : false; %>
+    <% const _ailySkillId = (typeof ailySkillId !== 'undefined') ? (ailySkillId || '') : ''; %>
+    <% if (!_hasCreds) { %>
+      <div class="warn" style="margin: 16px 0;">
+        <div>缺少飞书应用凭证：请配置 <code>FEISHU_CLIENT_ID</code> 与 <code>FEISHU_CLIENT_SECRET</code>。</div>
+      </div>
+    <% } %>
+
+    <div class="row">
+      <div class="card col">
+        <div class="muted">AppID</div>
+        <div><code><%= ailyAppId %></code></div>
+        <div class="muted" style="margin-top: 10px;">skill_id</div>
+        <div><code><%= _ailySkillId %></code></div>
+        <div class="muted" style="margin-top: 10px;">data_asset_ids</div>
+        <div><code><%= (dataAssetIds || []).join(',') %></code></div>
+        <div class="muted" style="margin-top: 10px;">data_asset_tag_ids</div>
+        <div><code><%= (dataAssetTagIds || []).join(',') %></code></div>
+
+        <div style="margin-top: 14px;">
+          <div class="switch">
+            <label class="muted">接口类型</label>
+            <select id="mode">
+              <option value="knowledge">执行知识问答</option>
+              <option value="conversation">多轮对话</option>
+              <option value="skill">调用技能</option>
+            </select>
+            <button id="btnReset" type="button" style="background:#374151;border-color:#374151;">重置会话</button>
+          </div>
+          <div id="skillFields" style="display:none; margin-top: 12px;">
+            <div class="muted">skill_id（可选，默认用环境变量 FEISHU_AILY_SKILL_ID）</div>
+            <input id="skillId" placeholder="skill_xxx" value="<%= _ailySkillId %>" />
+            <div class="muted" style="margin-top: 10px;">global_variable（可选，JSON；系统会自动注入 query=问题）</div>
+            <textarea id="skillGlobal" placeholder="{ }"></textarea>
+          </div>
+          <div class="muted" id="qLabel">问题</div>
+          <textarea id="q" placeholder="输入你的问题…"></textarea>
+          <div style="margin-top: 10px;">
+            <button id="btnAsk" type="button">提问</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card col">
+        <div class="muted">回答</div>
+        <pre id="answer" style="min-height: 220px;"></pre>
+        <details style="margin-top: 10px;">
+          <summary class="muted">Raw</summary>
+          <pre id="raw"></pre>
+        </details>
+      </div>
+    </div>
+
+    <script>
+      async function postJson(url, body) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body || {}),
+        });
+        const text = await res.text();
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) throw new Error(text || String(res.status));
+        return json;
+      }
+
+      document.getElementById('btnAsk').addEventListener('click', async () => {
+        const q = document.getElementById('q').value.trim();
+        if (!q) return;
+        document.getElementById('answer').textContent = '...';
+        document.getElementById('raw').textContent = '';
+        try {
+          const mode = document.getElementById('mode').value;
+          const payload = { question: q, mode };
+          if (mode === 'skill') {
+            payload.skillId = document.getElementById('skillId').value.trim();
+            payload.skillGlobalVariable = document.getElementById('skillGlobal').value.trim();
+          }
+          const data = await postJson('/feishu/api/chatbot/ask', payload);
+          document.getElementById('answer').textContent = data.answer || '';
+          document.getElementById('raw').textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+          document.getElementById('answer').textContent = String(e);
+        }
+      });
+
+      document.getElementById('btnReset').addEventListener('click', async () => {
+        try {
+          await postJson('/feishu/api/chatbot/session/reset', {});
+          alert('已重置会话');
+        } catch (e) {
+          alert(String(e));
+        }
+      });
+
+      function applyModeUi() {
+        const mode = document.getElementById('mode').value;
+        document.getElementById('skillFields').style.display = mode === 'skill' ? 'block' : 'none';
+        document.getElementById('btnReset').style.display = mode === 'conversation' ? 'inline-block' : 'none';
+        if (mode === 'skill') {
+          document.getElementById('qLabel').textContent = '问题（将作为 global_variable.query 传入技能）';
+          document.getElementById('q').placeholder = '什么是 PRM？';
+        } else {
+          document.getElementById('qLabel').textContent = '问题';
+          document.getElementById('q').placeholder = '输入你的问题…';
+        }
+      }
+
+      const saved = localStorage.getItem('chatbot_mode');
+      if (saved) document.getElementById('mode').value = saved;
+      applyModeUi();
+      document.getElementById('mode').addEventListener('change', () => {
+        localStorage.setItem('chatbot_mode', document.getElementById('mode').value);
+        applyModeUi();
+      });
+    </script>
+  </body>
+</html>
